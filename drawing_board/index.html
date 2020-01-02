@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%">
+
+<head>
+    <meta charset="UTF-8" />
+    <title></title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        #myCanvas {
+            display: block;
+            margin: 0 auto;
+            box-sizing: border-box;
+            background: #FFF;
+        }
+
+        .tools {
+            margin: 0 0 0 2px;
+            overflow: hidden;
+            margin-top: 10px;
+            padding: 0 5px;
+        }
+
+        .tools_row {
+            display: inline-flex;
+            align-items: center;
+            height: 25px;
+            justify-content: space-between;
+        }
+
+        .tools_right {
+            float: right;
+            display: flex;
+            align-items: center;
+            height: 25px
+        }
+
+        .tools_op {
+            display: flex;
+            align-items: center;
+            margin-left: 10px;
+        }
+
+        .tools_op img {
+            height: 25px;
+            width: 25px
+        }
+
+        .tools_row .color_btn {
+            width: 20px;
+            height: 20px;
+            background: #F18B87;
+            border: 0
+        }
+
+        .btn {
+            border: none;
+            padding: 0 10px;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .submit {
+            width: 80%;
+            margin: 20px auto 0px;
+            display: block;
+            line-height: 40px;
+            background: #409EFF;
+            color: #FFF
+        }
+
+        #colorSelect {
+            width: 25px;
+            height: 25px;
+            border: none;
+            border-radius: 50%
+        }
+
+        #canvasImg {
+            display: block;
+            margin: 0 auto;
+            border: 1px dotted #333;
+        }
+
+        .weight_btn {
+            border-radius: 50%;
+            background: #ccc;
+            border: 0
+        }
+    </style>
+</head>
+
+<body style="height: 100%; box-sizing: border-box; background: #EEEEEE;">
+    <div style="position: relative;">
+        <canvas id="myCanvas"></canvas>
+    </div>
+    <div class="tools">
+        <div class="tools_row" style="width: 100px;">
+            <span style="color: #1E1E1E">粗细</span>
+            <button style="width: 10px; height: 10px;" class="weight_btn" id="small"></button>
+            <button style="width: 15px; height: 15px;" class="weight_btn" id="middle"></button>
+            <button style="width: 20px; height: 20px;" class="weight_btn" id="large"></button>
+        </div>
+        <div class="tools_right">
+            <div id="cancel" class="tools_op">
+                <img src="icon_cancel.png" />
+            </div>
+            <div id="clip" class="tools_op">
+                <img src="icon_clip.png" />
+                <span>橡皮</span>
+            </div>
+            <div id="clearCanvas" class="tools_op">
+                <img src="icon_clear.png" />
+                <span>清除</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="tools">
+        <div class="tools_row" style="width: 220px;">
+            <span style="color: #1E1E1E">颜色</span>
+            <button style="background: #000;"    class="color_btn"></button>
+            <button style="background: #F18B87;" class="color_btn"></button>
+            <button style="background: #F8CA43;" class="color_btn"></button>
+            <button style="background: #5DADCB;" class="color_btn"></button>
+            <button style="background: #68C77B;" class="color_btn"></button>
+            <div style="position: relative;">
+                <span id="more_color"
+                    style="line-height: 30px; height: 30px; display: inline-block; color: #409EFF">更多</span>
+                <input style="position: absolute; width: 100%; height: 100%; left: 0; top: 0; opacity: 0;"
+                    id="colorSelect" type="color" placeholder="更多">
+            </div>
+        </div>
+    </div>
+    <button id="submit" class="btn submit" onclick="save()">保存</button>
+</body>
+
+<script>
+    let radius = 1, distance = 30;
+    let Radius = {
+        'small': 1,
+        'middle': 2,
+        'large': 3
+    }
+    let canvas = document.getElementById("myCanvas");
+    let selector = document.getElementById("colorSelect");
+    let color_btns = document.getElementsByClassName("color_btn");
+    let pen_weight_btns = document.getElementsByClassName("weight_btn");
+
+    let pageWidth = document.body.offsetWidth;
+    let pageHeight = document.body.offsetHeight;
+    let start_x, start_y, move_x, move_y, end_x, end_y;
+    let ratio = window.devicePixelRatio;
+    let ctx = canvas.getContext("2d");
+    canvas.width = pageWidth;
+    canvas.height = pageHeight * 0.6;
+    ctx.translate(0.2, 0.2);
+
+    if (ratio) {
+        let width = canvas.width, height = canvas.height;
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        canvas.height = height * window.devicePixelRatio;
+        canvas.width = width * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+
+    let t = canvas.offsetTop;
+    let l = canvas.offsetLeft;
+    let current_color = null;
+    let lastImageData = []
+
+    selector.onclick = (() => { set_mode('draw'); });
+    selector.onchange = selcolor;
+    document.getElementById("cancel").onclick = cancel;
+    document.getElementById('clearCanvas').onclick = clear;
+    document.getElementById("clip").onclick = onclip;
+
+    set_color('#000');
+    set_mode('draw');
+    tapClip();
+
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    for (let i = 0; i < color_btns.length; i++) {
+        color_btns[i].onclick = color_btn_click;
+    }
+
+    for (let i = 0; i < pen_weight_btns.length; i++) {
+        pen_weight_btns[i].onclick = weight_btn_click;
+    }
+
+    // 选择粗细
+    function weight_btn_click(args) {
+        radius = Radius[args.target.id];
+        set_mode('draw');
+    }
+
+    // 选择颜色
+    function color_btn_click(args) {
+        set_color(args.target.style.background);
+        set_mode('draw');
+    }
+
+    // 擦除
+    function onclip() {
+        set_mode('clip');
+    }
+
+    function selcolor() {
+        set_color(this.value);
+    }
+
+    function set_pen_color(color) {
+        for (let i = 0; i < pen_weight_btns.length; i++) {
+            pen_weight_btns[i].style.background = color;
+        }
+    }
+
+    function set_color(color) {
+        current_color = color;
+        ctx.strokeStyle = current_color;
+        ctx.fillStyle = current_color;
+        set_pen_color(color);
+    }
+
+    // 清屏
+    function clear() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        lastImageData = [];
+        set_mode('draw');
+    }
+
+    // 暂存数据
+    function saveImageData(data) {
+        (lastImageData.length == 20) && (lastImageData.shift());
+        lastImageData.push(data);
+    }
+
+    function cancel() {
+        set_mode('draw');
+        if (lastImageData.length < 1)
+            return false
+        ctx.putImageData(lastImageData[lastImageData.length - 1], 0, 0)
+        lastImageData.pop()
+    }
+
+    function getClipArea(e, hastouch) {
+        var x = hastouch ? e.targetTouches[0].pageX : e.clientX;
+        var y = hastouch ? e.targetTouches[0].pageY : e.clientY;
+        var ndom = canvas;
+
+        while (ndom.tagName !== "BODY") {
+            x -= ndom.offsetLeft;
+            y -= ndom.offsetTop;
+            ndom = ndom.parentNode;
+        }
+        return {
+            x: x,
+            y: y
+        }
+    }
+
+    // 设置模式
+    function set_mode(mode) {
+        if (mode === 'draw') {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.lineWidth = radius * 2;
+        }
+        else {
+            ctx.lineWidth = 10;
+            ctx.globalCompositeOperation = "destination-out";
+        }
+    }
+
+    // canvas 事件
+    function tapClip() {
+        let hastouch = "ontouchstart" in window ? true : false,
+            tapstart = hastouch ? "touchstart" : "mousedown",
+            tapmove = hastouch ? "touchmove" : "mousemove",
+            tapend = hastouch ? "touchend" : "mouseup";
+        let area;
+        let x2, y2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        canvas.addEventListener(tapstart, function (e) {
+            this.firstDot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            saveImageData(this.firstDot);
+            e.preventDefault();
+            area = getClipArea(e, hastouch);
+            x1 = area.x;
+            y1 = area.y;
+            drawLine(x1, y1);
+            this.addEventListener(tapmove, tapmoveHandler);
+            this.addEventListener(tapend, function () {
+                this.removeEventListener(tapmove, tapmoveHandler);
+            });
+
+            function tapmoveHandler(e) {
+                e.preventDefault();
+                area = getClipArea(e, hastouch);
+                x2 = area.x;
+                y2 = area.y;
+                drawLine(x1, y1, x2, y2);
+                x1 = x2;
+                y1 = y2;
+            }
+        })
+    }
+
+    function drawLine(x1, y1, x2, y2) {
+        ctx.save();
+        ctx.beginPath();
+        if (arguments.length == 2) {
+            ctx.arc(x1, y1, radius, 0, 2 * Math.PI);
+            ctx.fill();
+        } else {
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // 下载文件
+    function downLoad(url) {
+        var oA = document.createElement("a");
+        oA.download = 'canvas';
+        oA.href = url;
+        document.body.appendChild(oA);
+        oA.click();
+        oA.remove();
+    }
+
+    function save() {
+        var saveImage = canvas.toDataURL('image/png');
+        downLoad(saveImage);
+    }
+</script>
+
+</html>
