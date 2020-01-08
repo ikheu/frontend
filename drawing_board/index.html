@@ -96,7 +96,7 @@
 
 <body style="height: 100%; box-sizing: border-box; background: #EEEEEE;">
     <div style="position: relative;">
-        <canvas id="myCanvas"></canvas>
+        <canvas id="myCanvas" style="background: #212121;"></canvas>
     </div>
     <div class="tools">
         <div class="tools_row" style="width: 100px;">
@@ -123,7 +123,7 @@
     <div class="tools">
         <div class="tools_row" style="width: 220px;">
             <span style="color: #1E1E1E">颜色</span>
-            <button style="background: #000;"    class="color_btn"></button>
+            <button style="background: #000;" class="color_btn"></button>
             <button style="background: #F18B87;" class="color_btn"></button>
             <button style="background: #F8CA43;" class="color_btn"></button>
             <button style="background: #5DADCB;" class="color_btn"></button>
@@ -158,7 +158,9 @@
     let ctx = canvas.getContext("2d");
     canvas.width = pageWidth;
     canvas.height = pageHeight * 0.6;
-    ctx.translate(0.2, 0.2);
+    // ctx.translate(0.2, 0.2);
+
+
 
     if (ratio) {
         let width = canvas.width, height = canvas.height;
@@ -339,8 +341,39 @@
     }
 
     function save() {
-        var saveImage = canvas.toDataURL('image/png');
+        if (isCanvasBlank()) {
+            alert("please draw something");
+            return;
+        }
+        let saveImage = canvasToImage();
         downLoad(saveImage);
+    }
+
+    function canvasToImage() {
+        let target = canvas;
+        let backgroundColor = canvas.style.background;
+        let w = canvas.width, h = canvas.height;
+        if (backgroundColor) {
+            let data = ctx.getImageData(0, 0, w, h);
+            let blank = document.createElement('canvas');
+            let ctx_blank = blank.getContext("2d");
+            blank.width = w;
+            blank.height = h;
+            ctx_blank.putImageData(data, 0, 0);
+            ctx_blank.globalCompositeOperation = "destination-over";
+            ctx_blank.fillStyle = backgroundColor;
+            ctx_blank.fillRect(0, 0, w, h);
+            target = blank;
+        }
+        let imageData = target.toDataURL("image/png");
+        return imageData;
+    }
+
+    function isCanvasBlank() {
+        var blank = document.createElement('canvas');
+        blank.width = canvas.width;
+        blank.height = canvas.height;
+        return canvas.toDataURL() == blank.toDataURL();
     }
 </script>
 
